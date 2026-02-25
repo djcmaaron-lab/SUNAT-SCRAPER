@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+*.csv
+!ejemplo_entrada.csv
+.DS_Store
+venv/
