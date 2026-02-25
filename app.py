@@ -581,37 +581,28 @@ dz.addEventListener('drop', e => {
 
 function handleFile(file) {
   document.getElementById('fileName').innerHTML =
-    `<div class="file-badge">✅ ${file.name} · ${(file.size/1024).toFixed(1)}KB</div>`;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const parsed = parseCSV(e.target.result);
-    csvHeaders = parsed.headers;
-    csvRows    = parsed.rows;
-    allLeads   = csvRows.map(r => ({...r, _sel: true}));
-    guessColMap();
-    document.getElementById('btnCsvNext').disabled = false;
-    renderLeadsTable();
-  };
-  reader.readAsText(file, 'UTF-8');
-}
+    `<div class="file-badge">⏳ Subiendo ${file.name}...</div>`;
 
-function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  const hdrs = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
-  const rows = lines.slice(1).map(line => {
-    const vals = [];
-    let cur = '', inQ = false;
-    for (let c of line) {
-      if (c==='"') { inQ=!inQ; continue; }
-      if (c===',' && !inQ) { vals.push(cur.trim()); cur=''; continue; }
-      cur += c;
-    }
-    vals.push(cur.trim());
-    const obj = {};
-    hdrs.forEach((h,i) => obj[h] = vals[i]||'');
-    return obj;
-  }).filter(r => Object.values(r).some(v=>v));
-  return { headers: hdrs, rows };
+  // Subir al servidor para que Python lo parsee (soporta CSV y XLSX)
+  const fd = new FormData();
+  fd.append('file', file);
+  fetch('/upload', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(d => {
+      if (d.error) { alert('Error: ' + d.error); return; }
+      csvHeaders = d.headers;
+      csvRows    = d.rows;
+      allLeads   = csvRows.map(r => ({...r, _sel: true}));
+      guessColMap();
+      document.getElementById('fileName').innerHTML =
+        `<div class="file-badge">✅ ${file.name} · ${d.rows.length} filas</div>`;
+      document.getElementById('btnCsvNext').disabled = false;
+      renderLeadsTable();
+    })
+    .catch(e => {
+      document.getElementById('fileName').innerHTML =
+        `<div class="file-badge" style="color:red">❌ Error subiendo archivo</div>`;
+    });
 }
 
 function guessColMap() {
@@ -962,6 +953,54 @@ def download():
         mimetype="text/csv", as_attachment=True,
         download_name="empresas_enriquecidas.csv",
     )
+
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    """Parsea CSV o XLSX en el servidor y devuelve JSON con headers+rows"""
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "Sin archivo"}), 400
+
+    filename = f.filename.lower()
+    try:
+        if filename.endswith(".xlsx") or filename.endswith(".xls"):
+            import openpyxl
+            wb = openpyxl.load_workbook(f, read_only=True, data_only=True)
+            ws = wb.active
+            all_rows = list(ws.iter_rows(values_only=True))
+            if not all_rows:
+                return jsonify({"error": "Archivo vacío"}), 400
+            headers = [str(h).strip() if h is not None else f"col{i}" for i,h in enumerate(all_rows[0])]
+            rows = []
+            for row in all_rows[1:]:
+                obj = {}
+                for i, val in enumerate(row):
+                    if i < len(headers):
+                        obj[headers[i]] = str(val).strip() if val is not None else ""
+                if any(v for v in obj.values()):
+                    rows.append(obj)
+        else:
+            # CSV
+            import io as _io
+            text = f.read().decode("utf-8", errors="replace")
+            lines = text.strip().split("\n")
+            headers = [h.replace('"','').strip() for h in lines[0].split(",")]
+            rows = []
+            for line in lines[1:]:
+                vals, cur, inq = [], "", False
+                for c in line:
+                    if c == '"': inq = not inq; continue
+                    if c == "," and not inq: vals.append(cur.strip()); cur = ""; continue
+                    cur += c
+                vals.append(cur.strip())
+                obj = {headers[i]: vals[i] if i < len(vals) else "" for i in range(len(headers))}
+                if any(v for v in obj.values()):
+                    rows.append(obj)
+
+        return jsonify({"headers": headers, "rows": rows, "total": len(rows)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
