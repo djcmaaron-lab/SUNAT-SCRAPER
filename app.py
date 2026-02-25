@@ -580,6 +580,7 @@ dz.addEventListener('drop', e => {
 });
 
 function handleFile(file) {
+  console.log('[handleFile] Archivo:', file.name, file.size, file.type);
   document.getElementById('fileName').innerHTML =
     `<div class="file-badge">⏳ Subiendo ${file.name}...</div>`;
 
@@ -958,9 +959,12 @@ def download():
 @app.route("/upload", methods=["POST"])
 def upload():
     """Parsea CSV o XLSX en el servidor y devuelve JSON con headers+rows"""
+    print(f"[UPLOAD] Request recibido. Files: {list(request.files.keys())}")
     f = request.files.get("file")
     if not f:
+        print("[UPLOAD] ERROR: Sin archivo en request")
         return jsonify({"error": "Sin archivo"}), 400
+    print(f"[UPLOAD] Archivo recibido: {f.filename}, content_type: {f.content_type}")
 
     filename = f.filename.lower()
     try:
