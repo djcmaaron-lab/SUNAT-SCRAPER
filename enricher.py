@@ -44,11 +44,20 @@ def detectar_col_empresa(row):
     return ""
 
 def detectar_col_rubro(row):
-    prioridad = ["rubro","categoria","type","sector","industria","giro","category"]
+    # NUNCA usar la misma col que empresa
+    col_empresa = None
+    for p in ["empresa","nombre","name","razon_social","company","negocio","business"]:
+        kl = {k.lower().strip(): k for k in row.keys()}
+        if p in kl:
+            col_empresa = kl[p]
+            break
+    prioridad = ["rubro","categoria","tipo_negocio","sector","industria","giro","category","type","campaign"]
     keys_lower = {k.lower().strip(): k for k in row.keys()}
     for p in prioridad:
-        if p in keys_lower:
-            return str(row[keys_lower[p]] or "")
+        if p in keys_lower and keys_lower[p] != col_empresa:
+            val = str(row[keys_lower[p]] or "").strip()
+            if val and val != "None":
+                return val
     return ""
 
 def detectar_col_ruc(row):
@@ -156,15 +165,46 @@ def scrape_rubros_ccl(rubros_lista):
 
 def buscar_ruc_por_nombre(nombre, session=None):
     session = session or _session()
+    q = requests.utils.quote(nombre)
+
+    # API 1: apis.net.pe
     try:
-        url = f"https://api.apis.net.pe/v2/sunat/ruc/buscar?razonSocial={requests.utils.quote(nombre)}"
-        r = session.get(url, timeout=12)
+        r = session.get(f"https://api.apis.net.pe/v2/sunat/ruc/buscar?razonSocial={q}", timeout=10)
         if r.status_code == 200:
             d = r.json()
-            if isinstance(d, list): return d[:5]
-            if isinstance(d, dict) and "data" in d: return d["data"][:5]
+            if isinstance(d, list) and d: return d[:5]
+            if isinstance(d, dict) and d.get("data"): return d["data"][:5]
     except Exception:
         pass
+
+    # API 2: sunat.cloud
+    try:
+        r = session.get(f"https://api.sunat.cloud/ruc/busqueda/{q}", timeout=10)
+        if r.status_code == 200:
+            d = r.json()
+            if isinstance(d, list) and d: return d[:5]
+            if isinstance(d, dict) and d.get("data"): return d["data"][:5]
+    except Exception:
+        pass
+
+    # API 3: sunat directo scraping por nombre
+    try:
+        url = f"https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/jcrS00Alias?accion=consPorRazonSoc&razonSocial={q}&nroRuc=&nroDoc=&tipoDoc=&contexto=ti-it&modo=1&nroRucOrigen=10000000001&cmbTipo=1&tipdoc=1&start=0&num_rs=5"
+        r = session.get(url, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        results = []
+        for tr in soup.find_all("tr"):
+            tds = tr.find_all("td")
+            if len(tds) >= 2:
+                ruc_td = _digits(tds[0].get_text())
+                nom_td = _norm(tds[1].get_text())
+                if len(ruc_td) == 11:
+                    results.append({"numeroDocumento": ruc_td, "nombre": nom_td})
+        if results:
+            return results[:5]
+    except Exception:
+        pass
+
     return []
 
 def obtener_datos_ruc(ruc, session=None):
