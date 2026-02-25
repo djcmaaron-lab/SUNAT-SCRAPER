@@ -541,8 +541,9 @@ let currentStep = 1;
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────────────────────
 function goStep(n) {
-  if (n > currentStep + 1) return; // no saltar pasos
+  if (n > currentStep + 1) return;
   currentStep = n;
+  if (n===3) setTimeout(renderColMap, 50);
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById('page' + n).classList.add('active');
   document.querySelectorAll('.step-item').forEach(s => {
@@ -676,12 +677,8 @@ function renderColMap() {
   `).join('');
 }
 
-// Override goStep para renderizar col map al llegar al paso 3
-const _origGoStep = goStep;
-function goStep(n) {
-  _origGoStep(n);
-  if (n===3) renderColMap();
-}
+// renderColMap se llama desde dentro de goStep directamente
+// (no override — evita recursión infinita)
 
 // ── RUBROS CCL ────────────────────────────────────────────────────────────────
 async function cargarRubros() {
