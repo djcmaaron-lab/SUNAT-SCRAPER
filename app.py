@@ -752,9 +752,10 @@ async function iniciarScrapeRubros() {
 // ── ENRIQUECIMIENTO ───────────────────────────────────────────────────────────
 async function iniciarEnriquecimiento() {
   // Detectar columna empresa si colMap no está configurado
-  const colEmpresa = colMap.empresa || guessCol(csvHeaders, ['empresa','nombre','name','razon_social','company']);
-  const colRubro   = colMap.rubro   || guessCol(csvHeaders, ['rubro','categoria','type','sector','campaign']);
-  const colRuc     = colMap.ruc     || guessCol(csvHeaders, ['ruc','documento','cif_detected']);
+  const _guess = (kws) => csvHeaders.find(h => kws.some(k => h.toLowerCase().includes(k.toLowerCase()))) || '';
+  const colEmpresa = colMap.empresa || _guess(['empresa','nombre','name','razon_social','company']);
+  const colRubro   = colMap.rubro   || _guess(['rubro','categoria','type','sector','campaign']);
+  const colRuc     = colMap.ruc     || _guess(['ruc','documento','cif_detected']);
 
   selectedLeads = allLeads.filter(r => r._sel).map(r => {
     const obj = {...r};
