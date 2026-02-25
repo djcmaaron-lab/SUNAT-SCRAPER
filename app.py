@@ -953,9 +953,8 @@ def download():
         results = list(STATE.get("results", []))
     if not results:
         return jsonify({"error": "Sin resultados"}), 404
-    fields = ["empresa","rubro","ruc","razon_social","tipo","estado","condicion",
-              "representante","cargo_rep","telefono","email",
-              "direccion","departamento","provincia","distrito","fuentes"]
+    from enricher import CAMPOS_SALIDA
+    fields = CAMPOS_SALIDA
     out = io.StringIO()
     w = csv.DictWriter(out, fieldnames=fields, extrasaction="ignore")
     w.writeheader()
