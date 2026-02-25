@@ -751,15 +751,22 @@ async function iniciarScrapeRubros() {
 
 // ── ENRIQUECIMIENTO ───────────────────────────────────────────────────────────
 async function iniciarEnriquecimiento() {
+  // Detectar columna empresa si colMap no está configurado
+  const colEmpresa = colMap.empresa || guessCol(csvHeaders, ['empresa','nombre','name','razon_social','company']);
+  const colRubro   = colMap.rubro   || guessCol(csvHeaders, ['rubro','categoria','type','sector','campaign']);
+  const colRuc     = colMap.ruc     || guessCol(csvHeaders, ['ruc','documento','cif_detected']);
+
   selectedLeads = allLeads.filter(r => r._sel).map(r => {
     const obj = {...r};
     delete obj._sel;
     return {
-      empresa: obj[colMap.empresa] || obj.empresa || '',
-      rubro:   obj[colMap.rubro]   || obj.rubro   || '',
-      ruc:     obj[colMap.ruc]     || obj.ruc      || '',
+      empresa: obj[colEmpresa] || obj.empresa || obj.name || obj.nombre || '',
+      rubro:   obj[colRubro]   || obj.rubro   || obj.type || '',
+      ruc:     obj[colRuc]     || obj.ruc      || '',
     };
   }).filter(e => e.empresa);
+  
+  console.log('[ENRICH] Total leads a procesar:', selectedLeads.length, 'col empresa:', colEmpresa);
 
   logCount = 0;
   document.getElementById('logBox').innerHTML = '';
