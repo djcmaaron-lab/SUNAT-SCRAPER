@@ -607,10 +607,12 @@ function handleFile(file) {
 }
 
 function guessColMap() {
-  const g = (kws) => csvHeaders.find(h => kws.some(k => h.toLowerCase().includes(k))) || '';
-  colMap.empresa = g(['empresa','nombre','razon','company','name']);
-  colMap.rubro   = g(['rubro','categoria','sector','industria','giro']);
-  colMap.ruc     = g(['ruc','documento','doc']);
+  const g = (kws) => csvHeaders.find(h => kws.some(k => h.toLowerCase() === k.toLowerCase())) || 
+                     csvHeaders.find(h => kws.some(k => h.toLowerCase().includes(k.toLowerCase()))) || '';
+  colMap.empresa = g(['name','empresa','nombre','razon_social','company']);
+  colMap.rubro   = g(['type','rubro','categoria','sector','industria','giro','campaign']);
+  colMap.ruc     = g(['ruc','cif_detected','documento','doc']);
+  console.log('[guessColMap] empresa='+colMap.empresa+' rubro='+colMap.rubro+' ruc='+colMap.ruc);
 }
 
 // ── LEADS TABLE ───────────────────────────────────────────────────────────────
@@ -618,23 +620,33 @@ function renderLeadsTable(filter='') {
   const filt = filter.toLowerCase();
   const visible = allLeads.filter(r => {
     if (!filt) return true;
-    return Object.values(r).some(v => String(v).toLowerCase().includes(filt));
+    const emp = r[colMap.empresa] || r.name || r.empresa || '';
+    return emp.toLowerCase().includes(filt);
   });
 
   const hdr = document.getElementById('leadsHeader');
   const body = document.getElementById('leadsBody');
 
-  const cols = csvHeaders.length ? csvHeaders : ['empresa','rubro'];
+  // Mostrar solo columnas clave para no matar el browser con 66 columnas
+  const keyCols = [colMap.empresa||'name', colMap.rubro||'type', 'city', 'phone'].filter(c => csvHeaders.includes(c));
+  const cols = keyCols.length ? keyCols : (csvHeaders.slice(0,4));
+
   hdr.innerHTML = `<th style="width:32px"><input type="checkbox" id="chkAll" onchange="toggleAll(this.checked)" checked></th>` +
     cols.map(c=>`<th>${c}</th>`).join('');
 
-  body.innerHTML = visible.map((row, i) => {
+  // Preview de 100 filas max en tabla, pero TODOS están en allLeads para procesar
+  const preview = visible.slice(0, 100);
+  body.innerHTML = preview.map((row) => {
     const idx = allLeads.indexOf(row);
     return `<tr>
       <td><input type="checkbox" data-idx="${idx}" ${row._sel?'checked':''} onchange="toggleLead(${idx},this.checked)"></td>
       ${cols.map(c=>`<td>${row[c]||''}</td>`).join('')}
     </tr>`;
   }).join('');
+
+  if (visible.length > 100) {
+    body.innerHTML += `<tr><td colspan="${cols.length+1}" style="text-align:center;color:var(--muted);font-family:var(--mono);font-size:0.75rem;padding:0.8rem">... y ${visible.length - 100} más (todas seleccionadas)</td></tr>`;
+  }
 
   updateLeadsCount();
 }
