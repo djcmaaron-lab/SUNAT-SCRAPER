@@ -969,13 +969,18 @@ def upload():
     filename = f.filename.lower()
     try:
         if filename.endswith(".xlsx") or filename.endswith(".xls"):
-            import openpyxl
-            wb = openpyxl.load_workbook(f, read_only=True, data_only=True)
+            import openpyxl, io as _io2
+            file_bytes = f.read()
+            print(f"[UPLOAD] Bytes leidos: {len(file_bytes)}")
+            wb = openpyxl.load_workbook(_io2.BytesIO(file_bytes), read_only=True, data_only=True)
             ws = wb.active
+            print(f"[UPLOAD] Sheet: {ws.title}, max_row={ws.max_row}")
             all_rows = list(ws.iter_rows(values_only=True))
+            print(f"[UPLOAD] Filas totales: {len(all_rows)}")
             if not all_rows:
-                return jsonify({"error": "Archivo vacío"}), 400
+                return jsonify({"error": "Archivo vacio"}), 400
             headers = [str(h).strip() if h is not None else f"col{i}" for i,h in enumerate(all_rows[0])]
+            print(f"[UPLOAD] Headers: {headers[:5]}")
             rows = []
             for row in all_rows[1:]:
                 obj = {}
@@ -984,6 +989,7 @@ def upload():
                         obj[headers[i]] = str(val).strip() if val is not None else ""
                 if any(v for v in obj.values()):
                     rows.append(obj)
+            print(f"[UPLOAD] Filas con datos: {len(rows)}")
         else:
             # CSV
             import io as _io
